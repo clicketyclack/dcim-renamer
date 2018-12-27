@@ -21,7 +21,16 @@
 import subprocess
 import re
 
-class Exiv2Reader(object):
+class DcimImage(object):
+
+
+    def __init__(self, absfile):
+        self._exif_tags = None
+
+        if absfile != None:
+            stdout = self.get_exiv2_stdout(absfile)
+            self._exif_tags = self.keyvals_from_exiv2_stdout(stdout)
+            self._extract_maker_specifics()
 
     def get_exiv2_stdout(self, absfile):
         """
@@ -43,6 +52,8 @@ class Exiv2Reader(object):
     def keyvals_from_exiv2_stdout(self, stdout):
         """
         stdout must be passed in as a multi-line string.
+
+        Converts exif2-style stdout into key-value dict.
         """
         if str(stdout) != stdout:
             raise TypeError("kjfdh '%s'" % stdout)
@@ -66,6 +77,71 @@ class Exiv2Reader(object):
 
         #print(toreturn)
         return toreturn
+
+
+    def _extract_maker_specifics(self):
+        """
+        Not all camera makers put the serial number in the same tag.
+
+        Call this method after reading exif2 tags
+        """
+
+        if self._exif_tags is None:
+            raise TypeError("%._extract_maker_specifics() called without successfull exif tag read." % str(self))
+
+        if 'Exif.Canon.SerialNumber' in self._exif_tags:
+            self._exif_tags['SerialNumber'] = self._exif_tags['Exif.Canon.SerialNumber']
+        elif 'Exif.Photo.BodySerialNumber' in self._exif_tags:
+            self._exif_tags['SerialNumber'] = self._exif_tags['Exif.Photo.BodySerialNumber']
+        else:
+            raise TypeError("Could not extract SerialNumber from keys '%s'" % self._exif_tags.keys())
+
+
+        if 'Exif.Image.Model' in self._exif_tags:
+            self._exif_tags['Model'] = self._exif_tags['Exif.Image.Model']
+        else:
+            raise TypeError("Could not extract model from keys '%s'" % self._exif_tags.keys())
+
+
+        if 'Exif.Photo.DateTimeOriginal' in self._exif_tags:
+            self._exif_tags['DateTimeOriginal'] = self._exif_tags['Exif.Photo.DateTimeOriginal']
+        else:
+            raise TypeError("Could not extract DateTimeOriginal from keys '%s'" % self._exif_tags.keys())
+
+
+
+    def get_camera_designation(self, exif_tags=None):
+        """
+        Return short designation for camera.
+        """
+
+        tags = exif_tags
+
+        if tags is None:
+            tags = self._exif_tags
+
+        if tags is None:
+            raise TypeError("get_camera_designation got none exif_tags")
+
+        if 'Model' not in tags:
+            keys = tags.keys()
+            keys = [k for k in keys if 'odel' in k]
+            msg = "%s Could not determine model from exif keys. Potential keys are '%s'" % (str(self), keys)
+            raise TypeError(msg)
+
+        model = tags['Model']
+
+        if model == 'Canon EOS 7D':
+            serial = tags['SerialNumber']
+            if '3456' in serial:
+                return '7Dmk1_First'
+            else:
+                return '7Dmk1_Second'
+
+        if model == 'Canon EOS 80D':
+            return '80Dmk1'
+
+
 
 if __name__ == '__main__':
     pass

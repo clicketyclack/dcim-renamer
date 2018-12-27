@@ -22,19 +22,29 @@
 import unittest
 import os
 
-from dcim_renamer import Exiv2Reader
+from dcim_renamer import DcimImage
 
 class TestDcimRunner(unittest.TestCase):
     """
     Verify Dcim output parser.
     """
 
+    @classmethod
+    def setUpClass(cls):
+
+        cls.img_0071 = DcimImage(os.path.abspath(os.path.join('.', 'DCIM/IMG_0071.JPG')))
+        cls.img_0072 = DcimImage(os.path.abspath(os.path.join('.', 'DCIM/IMG_0072.JPG')))
+        cls.img_0080 = DcimImage(os.path.abspath(os.path.join('.', 'DCIM/IMG_0080.JPG')))
+
+
+
     def test_dcim_reader(self):
         """
         Test that we can get raw output from exif2 calls.
         """
-        er = Exiv2Reader()
-        abspath = os.path.abspath(os.path.join('.', 'DCIM/IMG_0001.JPG'))
+
+        abspath = os.path.abspath(os.path.join('.', 'DCIM/IMG_0071.JPG'))
+        er = DcimImage(abspath)
         raw_output = er.get_exiv2_stdout(abspath)
         self.assertTrue('EF24-105mm' in raw_output)
 
@@ -68,12 +78,19 @@ Exif.CanonSi.WhiteBalance                     Auto
 Exif.Photo.BodySerialNumber                   0123456789
 Exif.Photo.MakerNote                          (Binary value suppressed)
 """
-        er = Exiv2Reader()
-        keyvals = er.keyvals_from_exiv2_stdout(raw_output)
+
+        keyvals = self.img_0080.keyvals_from_exiv2_stdout(raw_output)
         self.assertEqual(keyvals['Exif.Image.Model'], "Canon EOS 7D")
         self.assertEqual(keyvals['Exif.Photo.DateTimeOriginal'], "2017:07:30 02:44:14")
         self.assertEqual(keyvals['Exif.Photo.BodySerialNumber'], "0123456789")
         self.assertEqual(keyvals['Exif.Photo.MakerNote'], "(Binary value suppressed)")
+
+
+    def test_get_x(self):
+        self.assertEqual(self.img_0071.get_camera_designation(), "7Dmk1_First")
+        self.assertEqual(self.img_0072.get_camera_designation(), "7Dmk1_Second")
+        self.assertEqual(self.img_0080.get_camera_designation(), "80Dmk1")
+        #_set_serial_number
 
 
 
