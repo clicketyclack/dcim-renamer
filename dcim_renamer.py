@@ -22,6 +22,7 @@ import subprocess
 import re
 import os
 import traceback
+import sys
 
 class DcimImage(object):
 
@@ -31,6 +32,23 @@ class DcimImage(object):
         self._exif_tags = None
 
         if absfile != None:
+
+            if os.path.abspath(absfile) != absfile:
+                clsname = self.__class__.__name__
+                msg = "%s constructed with absfile '%s', which does not seem to be an absolute path." % (clsname, absfile)
+                raise ValueError(msg)
+
+            if not os.path.exists(absfile):
+                clsname = self.__class__.__name__
+                msg = "%s constructed with absfile '%s', which does not seem to exist." % (clsname, absfile)
+                raise ValueError(msg)
+
+            if not os.path.isfile(absfile):
+                clsname = self.__class__.__name__
+                msg = "%s constructed with absfile '%s', which does not seem to be a file." % (clsname, absfile)
+                raise ValueError(msg)
+
+
             stdout = self.get_exiv2_stdout(absfile)
             self._exif_tags = self.keyvals_from_exiv2_stdout(stdout)
             self._extract_maker_specifics()
@@ -134,6 +152,25 @@ class DcimImage(object):
 
         model = tags['Model']
 
+
+        try:
+            from conf import tags2shorthand
+            model = tags2shorthand(tags)
+            if model is not None:
+                return model
+
+        except Exception:
+            pass
+
+        try:
+            from conf_sample import tags2shorthand
+            model = tags2shorthand(tags)
+            if model is not None:
+                return model
+
+        except Exception:
+            pass
+
         if model == 'Canon EOS 7D':
             serial = tags['SerialNumber']
             if '3456' in serial:
@@ -143,6 +180,9 @@ class DcimImage(object):
 
         if model == 'Canon EOS 80D':
             return '80Dmk1'
+
+        msg = "Could not determine shorthand camera designation for camera with model '%s'" % model
+        raise KeyError(msg)
 
     def get_short_dateformat(self):
         """
@@ -230,9 +270,14 @@ class DcimImage(object):
         toreturn = ["cd '%s/'" % self.get_directory()]
         toreturn += ["mv -v -n '%s' '%s'" % (old_filename, new_filename)]
         toreturn += ["cd /tmp"]
-        
+
         return toreturn
 
 
 if __name__ == '__main__':
-    pass
+    cwd = os.getcwd()
+    for arg in sys.argv:
+        if arg.lower().endswith('.jpg'):
+            abspath = os.path.abspath(os.path.join(cwd, arg))
+            di = DcimImage(abspath)
+            print("\n".join(di.generate_mv_cmds()))

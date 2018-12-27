@@ -130,5 +130,39 @@ Exif.Photo.MakerNote                          (Binary value suppressed)
         self.assertEqual("mv -v -n 'IMG_0071.JPG' '2017_07_30_024414_7Dmk1_First_IMG_0071.jpg'", cmds[1])
 
 
+    def test_filename_exceptions(self):
+        """
+        Verify that we get exceptions on certain cases.
+        """
+        try:
+            dcim_none = DcimImage(None)
+        except Exception as e:
+            self.fail("DcimImages should be able to handle None arguments as special cases, got '%s'." % str(e))
+
+        try:
+            dcim_dir = DcimImage(os.path.abspath('./'))
+        except ValueError as e:
+            self.assertTrue('s not seem to be a file' in str(e))
+
+        try:
+            dcim_inexistent_dir = DcimImage(os.path.abspath('./Vpy10RIX9AVr2MZsqFpm5SBJ/'))
+        except ValueError as e:
+            self.assertTrue('ich does not seem to exist.' in str(e))
+
+        try:
+            dcim_inexistent_file = DcimImage(os.path.abspath('./IMG_5555.JPG'))
+        except ValueError as e:
+            self.assertTrue('ich does not seem to exist.' in str(e))
+
+        try:
+            dcim_not_abspath = DcimImage('DCIM/Wedding/IMG_7003.JPG')
+        except ValueError as e:
+            self.assertTrue('t seem to be an absolute path.' in str(e))
+
+
+
+
+
+
 if __name__ == '__main__':
     unittest.main()
