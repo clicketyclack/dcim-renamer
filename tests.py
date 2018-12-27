@@ -21,9 +21,8 @@
 
 import unittest
 import os
-import sys
 
-from dcim_renamer import *
+from dcim_renamer import Exiv2Reader
 
 class TestDcimRunner(unittest.TestCase):
     """
@@ -38,6 +37,44 @@ class TestDcimRunner(unittest.TestCase):
         abspath = os.path.abspath(os.path.join('.', 'DCIM/IMG_0001.JPG'))
         raw_output = er.get_exiv2_stdout(abspath)
         self.assertTrue('EF24-105mm' in raw_output)
+
+
+
+    def test_exiv2_parsing(self):
+        """
+        Verify parsing.
+        """
+
+        raw_output = """Exif.Photo.DateTimeOriginal                   2017:07:30 02:44:14
+Exif.CanonFi.NoiseReduction                   Off
+Exif.CanonSi.TargetAperture                   F1
+Exif.Photo.RecommendedExposureIndex           1600
+Exif.CanonFi.FilterEffect                     None
+Exif.Canon.ThumbnailImageValidArea            0 159 7 112
+Exif.CanonPr.ColorTemperature                 0
+Exif.Photo.SubSecTimeOriginal                 00
+Exif.CanonSi.ISOSpeed                         3.51844e+15
+Exif.Image.Artist                             Erik Mossberg clicketyclack@users.noreply.github.com
+Exif.Canon.InternalSerialNumber               S0123456A
+Exif.CanonFi.RawJpgSize                       Large
+Exif.CanonCs.FlashActivity                    Did not fire
+Exif.CanonCs.Lens                             0 0 0
+Exif.CanonSi.FlashBias                        0 EV
+Exif.CanonCs.DriveMode                        Single / timer
+Exif.Image.Model                              Canon EOS 7D
+Exif.CanonPr.PictureStyle                     None
+Exif.Canon.AFInfo                             182 2 19 19 5184 3456 5184 3456 222 222 222 222 222 222 222 222 222 222 222 222 222 222 222 222 222 222 222 266 266 266 266 266 266 266 266 266 266 266 266 266 266 266 266 266 266 266 64163 64655 64655 64655 65143 65143 65143 0 0 0 0 0 393 393 393 881 881 881 1373 0 393 0 65143 393 0 65143 743 393 0 65143 64793 393 0 65143 393 0 65143 0 8192 0 8192 0 0 0 65535
+Exif.CanonSi.WhiteBalance                     Auto
+Exif.Photo.BodySerialNumber                   0123456789
+Exif.Photo.MakerNote                          (Binary value suppressed)
+"""
+        er = Exiv2Reader()
+        keyvals = er.keyvals_from_exiv2_stdout(raw_output)
+        self.assertEqual(keyvals['Exif.Image.Model'], "Canon EOS 7D")
+        self.assertEqual(keyvals['Exif.Photo.DateTimeOriginal'], "2017:07:30 02:44:14")
+        self.assertEqual(keyvals['Exif.Photo.BodySerialNumber'], "0123456789")
+        self.assertEqual(keyvals['Exif.Photo.MakerNote'], "(Binary value suppressed)")
+
 
 
 if __name__ == '__main__':
