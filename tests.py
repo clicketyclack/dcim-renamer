@@ -86,12 +86,48 @@ Exif.Photo.MakerNote                          (Binary value suppressed)
         self.assertEqual(keyvals['Exif.Photo.MakerNote'], "(Binary value suppressed)")
 
 
-    def test_get_x(self):
+    def test_get_camera_designation(self):
+        """
+        Verify that we can give camera names to images depending on both model and serial number.
+        """
         self.assertEqual(self.img_0071.get_camera_designation(), "7Dmk1_First")
         self.assertEqual(self.img_0072.get_camera_designation(), "7Dmk1_Second")
         self.assertEqual(self.img_0080.get_camera_designation(), "80Dmk1")
         #_set_serial_number
 
+    def test_datetime_extraction(self):
+        """
+        Verify that we can extract original datetime for use in new filenames.
+        """
+
+        expected = '2017_07_30_024414'
+        actual = self.img_0071.get_new_filename()
+        msg = "Expected date '%s' to be in new filename '%s', but it wasn't." % (expected, actual)
+        self.assertTrue(expected in actual, msg)
+
+        self.assertTrue('2017_02_30_024414' in self.img_0072.get_new_filename())
+        self.assertTrue('2018_08_30_024414' in self.img_0080.get_new_filename())
+
+    def test_filename_mangling(self):
+        """
+        Verify that we can split abspaths from constructors into filepart and directory parts.
+        """
+        self.assertEqual(self.img_0071.get_old_filename(), "IMG_0071.JPG")
+
+        msg = "Expected new file name to end with 'IMG_0071.jpg', got '%s'" % self.img_0071.get_new_filename()
+        self.assertTrue(self.img_0071.get_new_filename().endswith('IMG_0071.jpg'), msg)
+
+        self.assertTrue('7Dmk1_First' in self.img_0071.get_new_filename())
+
+    def test_gen_mv_cmds(self):
+        """
+        Verify that we can generate move commands.
+        """
+        cmds = self.img_0071.generate_mv_cmds()
+        dcim_abspath = os.path.abspath('./DCIM/')
+        cmd0 = "cd '%s/'" % dcim_abspath
+        self.assertEqual(cmd0, cmds[0])
+        self.assertEqual("mv -v -n 'IMG_0071.JPG' '2017_07_30_024414_7Dmk1_First_IMG_0071.jpg'", cmds[1])
 
 
 if __name__ == '__main__':

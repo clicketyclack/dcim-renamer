@@ -20,11 +20,14 @@
 
 import subprocess
 import re
+import os
+import traceback
 
 class DcimImage(object):
 
 
     def __init__(self, absfile):
+        self._absfile = absfile
         self._exif_tags = None
 
         if absfile != None:
@@ -87,7 +90,7 @@ class DcimImage(object):
         """
 
         if self._exif_tags is None:
-            raise TypeError("%._extract_maker_specifics() called without successfull exif tag read." % str(self))
+            raise TypeError("%s._extract_maker_specifics() called without successfull exif tag read." % str(self))
 
         if 'Exif.Canon.SerialNumber' in self._exif_tags:
             self._exif_tags['SerialNumber'] = self._exif_tags['Exif.Canon.SerialNumber']
@@ -141,6 +144,94 @@ class DcimImage(object):
         if model == 'Canon EOS 80D':
             return '80Dmk1'
 
+    def get_short_dateformat(self):
+        """
+        Get date format.
+        """
+        try:
+            datestr = self._exif_tags['DateTimeOriginal']
+            date_part, time_part = datestr.split(' ')
+            toreturn = "%s_%s" % (date_part.replace(':', '_'), time_part.replace(':', ''))
+            return toreturn
+        except Exception as ex:
+            print("get_short_dateformat() failed for file %s, got exception '%s'" % (self._absfile, ex))
+
+
+    def get_directory(self):
+        """
+        Get the containing directory for this DCIM file.
+
+        I.e. for 'C:/SD-card copies/2010-11-12/DCIM/IMG_1234.JPG'
+          return 'C:/SD-card copies/2010-11-12/DCIM/'
+        """
+        return os.path.dirname(self._absfile)
+
+
+    def get_old_filename(self):
+        """
+        Get the old filename for this DCIM file.
+
+        I.e. for 'C:/SD-card copies/2010-11-12/DCIM/IMG_1234.JPG'
+          return 'IMG_1234.JPG'
+        """
+        return os.path.basename(self._absfile)
+
+
+
+    def get_new_filename(self):
+        """
+        Get the new suggested filename for this DCIM file.
+
+        I.e. for 'C:/SD-card copies/2010-11-12/DCIM/IMG_1234.JPG'
+          return '2010_11_12_125533_Ixus20_IMG_1234.jpg'
+        """
+
+        model_short = None
+        date_short = None
+
+        try:
+            model_short = self.get_camera_designation()
+            date_short = self.get_short_dateformat()
+
+        except Exception as ex:
+            print("get_new_filename(%s) could not extract model or date details, got '%s'" % (self._absfile, ex))
+            traceback.print_exc()
+
+        filename_part = self.get_old_filename()
+
+        if model_short in filename_part:
+            raise TypeError("Seems we have been called on a already renamed file: '%s'" % self._absfile)
+
+
+        dst_filename = "%s_%s_%s" % (date_short, model_short, filename_part)
+
+        # Make extension lowercase, but only for knows image extensions.
+        (root, ext) = os.path.splitext(dst_filename)
+        for ext_upper in ['.ARW', '.JPG', '.DNG', '.NEF', '.CR2']:
+            if ext.upper() == ext_upper:
+                dst_filename = "%s%s" % (root, ext.lower())
+                break
+
+        return dst_filename
+
+
+    def generate_mv_cmds(self):
+        """
+        Generate move commands.
+        """
+
+        old_filename = self.get_old_filename()
+        new_filename = self.get_new_filename()
+
+        if '/' in old_filename or '/' in new_filename:
+            msg = "Failed sanity check for renaming file : filenames '%s' or '%s' seem to still contain directory seperators." % (old_filename, new_filename)
+            raise Exception(msg)
+
+        toreturn = ["cd '%s/'" % self.get_directory()]
+        toreturn += ["mv -v -n '%s' '%s'" % (old_filename, new_filename)]
+        toreturn += ["cd /tmp"]
+        
+        return toreturn
 
 
 if __name__ == '__main__':
