@@ -92,7 +92,7 @@ Exif.Photo.MakerNote                          (Binary value suppressed)
         """
         self.assertEqual(self.img_0071.get_camera_designation(), "7Dmk1_First")
         self.assertEqual(self.img_0072.get_camera_designation(), "7Dmk1_Second")
-        self.assertEqual(self.img_0080.get_camera_designation(), "80Dmk1")
+        self.assertEqual(self.img_0080.get_camera_designation(), "80D")
         #_set_serial_number
 
     def test_datetime_extraction(self):

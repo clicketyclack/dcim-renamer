@@ -112,10 +112,9 @@ class DcimImage(object):
 
         if 'Exif.Canon.SerialNumber' in self._exif_tags:
             self._exif_tags['SerialNumber'] = self._exif_tags['Exif.Canon.SerialNumber']
+
         elif 'Exif.Photo.BodySerialNumber' in self._exif_tags:
             self._exif_tags['SerialNumber'] = self._exif_tags['Exif.Photo.BodySerialNumber']
-        else:
-            raise TypeError("Could not extract SerialNumber from keys '%s'" % self._exif_tags.keys())
 
 
         if 'Exif.Image.Model' in self._exif_tags:
@@ -126,6 +125,8 @@ class DcimImage(object):
 
         if 'Exif.Photo.DateTimeOriginal' in self._exif_tags:
             self._exif_tags['DateTimeOriginal'] = self._exif_tags['Exif.Photo.DateTimeOriginal']
+        if 'Exif.Photo.DateTimeDigitized' in self._exif_tags:
+            self._exif_tags['DateTimeOriginal'] = self._exif_tags['Exif.Photo.DateTimeDigitized']
         else:
             raise TypeError("Could not extract DateTimeOriginal from keys '%s'" % self._exif_tags.keys())
 
@@ -152,7 +153,6 @@ class DcimImage(object):
 
         model = tags['Model']
 
-
         try:
             from conf import tags2shorthand
             model = tags2shorthand(tags)
@@ -178,10 +178,7 @@ class DcimImage(object):
             else:
                 return '7Dmk1_Second'
 
-        if model == 'Canon EOS 80D':
-            return '80Dmk1'
-
-        msg = "Could not determine shorthand camera designation for camera with model '%s'" % model
+        msg = "Could not determine shorthand camera designation for camera with tags '%s'" % tags
         raise KeyError(msg)
 
     def get_short_dateformat(self):
@@ -237,6 +234,9 @@ class DcimImage(object):
             print("get_new_filename(%s) could not extract model or date details, got '%s'" % (self._absfile, ex))
             traceback.print_exc()
 
+        if model_short is None:
+            raise TypeError("Can not determine new filename without a model shorthand. Have None from file '%s'" % self._absfile)
+
         filename_part = self.get_old_filename()
 
         if model_short in filename_part:
@@ -246,12 +246,7 @@ class DcimImage(object):
         dst_filename = "%s_%s_%s" % (date_short, model_short, filename_part)
 
         # Make extension lowercase, but only for knows image extensions.
-        (root, ext) = os.path.splitext(dst_filename)
-        for ext_upper in ['.ARW', '.JPG', '.DNG', '.NEF', '.CR2']:
-            if ext.upper() == ext_upper:
-                dst_filename = "%s%s" % (root, ext.lower())
-                break
-
+        dst_filename = self.lower_img_extension(dst_filename)
         return dst_filename
 
 
@@ -273,11 +268,101 @@ class DcimImage(object):
 
         return toreturn
 
+    @staticmethod
+    def has_img_extension(filename):
+        """
+        Returns true if a file has a known image extension.
+        """
+        (_, ext) = os.path.splitext(filename)
+        ext_upper = ext.upper()
+        return ext_upper in ['.ARW', '.JPG', '.DNG', '.NEF', '.CR2']
+
+    @staticmethod
+    def lower_img_extension(filename):
+        """
+        Returns the filename extension, but lowercase. Leaves the filename
+        unchanged if the file extension is non-existent or non-image.
+        """
+        if DcimImage.has_img_extension(filename):
+            (root, ext) = os.path.splitext(filename)
+            for ext_upper in ['.ARW', '.JPG', '.DNG', '.NEF', '.CR2']:
+                if ext.upper() == ext_upper:
+                    new_filename = "%s%s" % (root, ext.lower())
+                    return new_filename
+
+        else:
+            return filename
+
+
+
+class DcimDirectory(object):
+
+    def __init__(self, abspath):
+        self._abspath = abspath
+        if os.path.abspath(self._abspath) != self._abspath:
+            clsname = self.__class__.__name__
+            msg = "%s constructed with absfile '%s', which does not seem to be an absolute path." % (clsname, self._abspath)
+            raise ValueError(msg)
+
+        if not os.path.isdir(self._abspath):
+            clsname = self.__class__.__name__
+            msg = "%s constructed with absfile '%s', which does not seem to be a directory." % (clsname, self._abspath)
+            raise ValueError(msg)
+
+
+    def filter_renameable_images(self, fnamelist=None):
+        """
+        Given a directory listing, return the files which are candidates for a DcimImage object.
+        """
+        toreturn = None
+
+        if fnamelist is None:
+            toreturn = os.listdir(self._abspath)
+        else:
+            toreturn = fnamelist[:]
+
+        toreturn = [fname for fname in toreturn if len(fname) == len('IMG_6685.JPG')]
+        toreturn = [fname for fname in toreturn if DcimImage.has_img_extension(fname)]
+        toreturn = [fname for fname in toreturn if re.match('.*_[0-9]{4}.*', fname)]
+
+        return toreturn
+
+
+    def generate_mv_cmds(self):
+        """
+        Recurse subdirectories.
+        """
+
+        all_entries = os.listdir(self._abspath)
+        imglist = self.filter_renameable_images(all_entries)
+
+        non_imgs = [f for f in all_entries if f not in imglist]
+
+        for fname in imglist:
+            try:
+                abspath = os.path.abspath(os.path.join(self._abspath, fname))
+                di = DcimImage(abspath)
+                print("\n".join(di.generate_mv_cmds()))
+            except Exception as e:
+                print("gen_mvcmds_for(%s) gave exception %s" % (self._abspath, e))
+                traceback.print_exc()
+
+        for non_img in non_imgs:
+            entry_abspath = os.path.abspath(os.path.join(self._abspath, non_img))
+            if os.path.isdir(entry_abspath):
+                dcim_dir = DcimDirectory(entry_abspath)
+                dcim_dir.generate_mv_cmds()
+
 
 if __name__ == '__main__':
     cwd = os.getcwd()
     for arg in sys.argv:
-        if arg.lower().endswith('.jpg'):
+        arg_lower = arg.lower()
+        if (DcimImage.has_img_extension(arg)):
             abspath = os.path.abspath(os.path.join(cwd, arg))
             di = DcimImage(abspath)
             print("\n".join(di.generate_mv_cmds()))
+        elif os.path.isdir(arg):
+            abspath = os.path.abspath(os.path.join(cwd, arg))
+            dd = DcimDirectory(abspath)
+            dd.generate_mv_cmds()

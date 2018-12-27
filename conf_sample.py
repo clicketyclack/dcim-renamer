@@ -85,7 +85,8 @@ def tags2shorthand(tags):
       'iPhone 6s' : 'iPhone6s',
       'iPhone 7' : 'iPhone7',
       'NIKON 1 J5' : '1J5',
+      'NIKON D800' : 'D800',
 }
 
     if model in model_mapping:
-        return model_mapping['Model']
+        return model_mapping[model]
